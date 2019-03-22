@@ -1,6 +1,6 @@
 # decimal
 
-[![Build Status](https://travis-ci.org/dexon-foundation/decimal.png?branch=master)](https://travis-ci.org/dexon-foundation/decimal) [![GoDoc](https://godoc.org/github.com/dexon-foundation/decimal?status.svg)](https://godoc.org/github.com/dexon-foundation/decimal) [![Go Report Card](https://goreportcard.com/badge/github.com/dexon-foundation/decimal)](https://goreportcard.com/report/github.com/dexon-foundation/decimal)
+[![Build Status](https://travis-ci.com/dexon-foundation/decimal.png?branch=master)](https://travis-ci.com/dexon-foundation/decimal) [![GoDoc](https://godoc.org/github.com/dexon-foundation/decimal?status.svg)](https://godoc.org/github.com/dexon-foundation/decimal) [![Go Report Card](https://goreportcard.com/badge/github.com/dexon-foundation/decimal)](https://goreportcard.com/report/github.com/dexon-foundation/decimal)
 
 Arbitrary-precision fixed-point decimal numbers in go.
 
