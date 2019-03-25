@@ -344,6 +344,14 @@ func NewFromFloatWithExponent(value float64, exp int32) Decimal {
 	}
 }
 
+// Rescale returns a rescaled version of the decimal. Returned
+// decimal may be less precise if the given exponent is bigger
+// than the initial exponent of the Decimal.
+// NOTE: this will truncate, NOT round
+func (d Decimal) Rescale(exp int32) Decimal {
+	return d.rescale(exp)
+}
+
 // rescale returns a rescaled version of the decimal. Returned
 // decimal may be less precise if the given exponent is bigger
 // than the initial exponent of the Decimal.
