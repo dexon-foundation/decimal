@@ -52,11 +52,14 @@ var DivisionPrecision = 16
 // silently lose precision.
 var MarshalJSONWithoutQuotes = false
 
-// Zero constant, to make computations faster.
-var Zero = New(0, 1)
-
-// fiveDec used in Cash Rounding
-var fiveDec = New(5, 0)
+// Common decimal constants, to make computations faster.
+var (
+	Zero = New(0, 0)
+	One  = New(1, 0)
+	Two  = New(2, 0)
+	Five = New(5, 0)
+	Ten  = New(1, 1)
+)
 
 var zeroInt = big.NewInt(0)
 var oneInt = big.NewInt(1)
@@ -544,9 +547,9 @@ func (d Decimal) Mod(d2 Decimal) Decimal {
 func (d Decimal) Pow(d2 Decimal) Decimal {
 	var temp Decimal
 	if d2.IntPart() == 0 {
-		return NewFromFloat(1)
+		return One
 	}
-	temp = d.Pow(d2.Div(NewFromFloat(2)))
+	temp = d.Pow(d2.Div(Two))
 	if d2.IntPart()%2 == 0 {
 		return temp.Mul(temp)
 	}
@@ -833,7 +836,7 @@ func (d Decimal) RoundCash(interval uint8) Decimal {
 			dOne := New(10^-int64(orgExp), orgExp)
 			d2 := d
 			d2.exp = 0
-			if d2.Mod(fiveDec).Equal(Zero) {
+			if d2.Mod(Five).IsZero() {
 				d2.exp = orgExp
 				d2 = d2.Sub(dOne)
 				d = d2
@@ -1215,29 +1218,35 @@ func (d NullDecimal) MarshalJSON() ([]byte, error) {
 
 // Atan returns the arctangent, in radians, of d.
 func (d Decimal) Atan() Decimal {
-	if d.Equal(NewFromFloat(0.0)) {
+	if d.IsZero() {
 		return d
 	}
-	if d.GreaterThan(NewFromFloat(0.0)) {
+	if d.IsPositive() {
 		return d.satan()
 	}
 	return d.Neg().satan().Neg()
 }
 
+var _xatanP = [...]Decimal{
+	NewFromFloat(-8.750608600031904122785e-01),
+	NewFromFloat(-1.615753718733365076637e+01),
+	NewFromFloat(-7.500855792314704667340e+01),
+	NewFromFloat(-1.228866684490136173410e+02),
+	NewFromFloat(-6.485021904942025371773e+01),
+}
+
+var _xatanQ = [...]Decimal{
+	NewFromFloat(2.485846490142306297962e+01),
+	NewFromFloat(1.650270098316988542046e+02),
+	NewFromFloat(4.328810604912902668951e+02),
+	NewFromFloat(4.853903996359136964868e+02),
+	NewFromFloat(1.945506571482613964425e+02),
+}
+
 func (d Decimal) xatan() Decimal {
-	P0 := NewFromFloat(-8.750608600031904122785e-01)
-	P1 := NewFromFloat(-1.615753718733365076637e+01)
-	P2 := NewFromFloat(-7.500855792314704667340e+01)
-	P3 := NewFromFloat(-1.228866684490136173410e+02)
-	P4 := NewFromFloat(-6.485021904942025371773e+01)
-	Q0 := NewFromFloat(2.485846490142306297962e+01)
-	Q1 := NewFromFloat(1.650270098316988542046e+02)
-	Q2 := NewFromFloat(4.328810604912902668951e+02)
-	Q3 := NewFromFloat(4.853903996359136964868e+02)
-	Q4 := NewFromFloat(1.945506571482613964425e+02)
 	z := d.Mul(d)
-	b1 := P0.Mul(z).Add(P1).Mul(z).Add(P2).Mul(z).Add(P3).Mul(z).Add(P4).Mul(z)
-	b2 := z.Add(Q0).Mul(z).Add(Q1).Mul(z).Add(Q2).Mul(z).Add(Q3).Mul(z).Add(Q4)
+	b1 := _xatanP[0].Mul(z).Add(_xatanP[1]).Mul(z).Add(_xatanP[2]).Mul(z).Add(_xatanP[3]).Mul(z).Add(_xatanP[4]).Mul(z)
+	b2 := z.Add(_xatanQ[0]).Mul(z).Add(_xatanQ[1]).Mul(z).Add(_xatanQ[2]).Mul(z).Add(_xatanQ[3]).Mul(z).Add(_xatanQ[4])
 	z = b1.Div(b2)
 	z = d.Mul(z).Add(d)
 	return z
@@ -1250,13 +1259,13 @@ func (d Decimal) satan() Decimal {
 	Tan3pio8 := NewFromFloat(2.41421356237309504880)      // tan(3*pi/8)
 	pi := NewFromFloat(3.14159265358979323846264338327950288419716939937510582097494459)
 
-	if d.LessThanOrEqual(NewFromFloat(0.66)) {
+	if d.LessThanOrEqual(New(66, -2)) {
 		return d.xatan()
 	}
 	if d.GreaterThan(Tan3pio8) {
-		return pi.Div(NewFromFloat(2.0)).Sub(NewFromFloat(1.0).Div(d).xatan()).Add(Morebits)
+		return pi.Div(Two).Sub(One.Div(d).xatan()).Add(Morebits)
 	}
-	return pi.Div(NewFromFloat(4.0)).Add((d.Sub(NewFromFloat(1.0)).Div(d.Add(NewFromFloat(1.0)))).xatan()).Add(NewFromFloat(0.5).Mul(Morebits))
+	return pi.Div(New(4, 0)).Add((d.Sub(One).Div(d.Add(One))).xatan()).Add(New(5, -1).Mul(Morebits))
 }
 
 // sin coefficients
@@ -1276,12 +1285,12 @@ func (d Decimal) Sin() Decimal {
 	PI4C := NewFromFloat(2.69515142907905952645e-15)                            // 0x3ce8469898cc5170,
 	M4PI := NewFromFloat(1.273239544735162542821171882678754627704620361328125) // 4/pi
 
-	if d.Equal(NewFromFloat(0.0)) {
+	if d.IsZero() {
 		return d
 	}
 	// make argument positive but save the sign
 	sign := false
-	if d.LessThan(NewFromFloat(0.0)) {
+	if d.IsNegative() {
 		d = d.Neg()
 		sign = true
 	}
@@ -1292,7 +1301,7 @@ func (d Decimal) Sin() Decimal {
 	// map zeros to origin
 	if j&1 == 1 {
 		j++
-		y = y.Add(NewFromFloat(1.0))
+		y = y.Add(One)
 	}
 	j &= 7 // octant modulo 2Pi radians (360 degrees)
 	// reflect in x axis
@@ -1305,7 +1314,7 @@ func (d Decimal) Sin() Decimal {
 
 	if j == 1 || j == 2 {
 		w := zz.Mul(zz).Mul(_cos[0].Mul(zz).Add(_cos[1]).Mul(zz).Add(_cos[2]).Mul(zz).Add(_cos[3]).Mul(zz).Add(_cos[4]).Mul(zz).Add(_cos[5]))
-		y = NewFromFloat(1.0).Sub(NewFromFloat(0.5).Mul(zz)).Add(w)
+		y = One.Sub(New(5, -1).Mul(zz)).Add(w)
 	} else {
 		y = z.Add(z.Mul(zz).Mul(_sin[0].Mul(zz).Add(_sin[1]).Mul(zz).Add(_sin[2]).Mul(zz).Add(_sin[3]).Mul(zz).Add(_sin[4]).Mul(zz).Add(_sin[5])))
 	}
@@ -1335,7 +1344,7 @@ func (d Decimal) Cos() Decimal {
 
 	// make argument positive
 	sign := false
-	if d.LessThan(NewFromFloat(0.0)) {
+	if d.IsNegative() {
 		d = d.Neg()
 	}
 
@@ -1345,7 +1354,7 @@ func (d Decimal) Cos() Decimal {
 	// map zeros to origin
 	if j&1 == 1 {
 		j++
-		y = y.Add(NewFromFloat(1.0))
+		y = y.Add(One)
 	}
 	j &= 7 // octant modulo 2Pi radians (360 degrees)
 	// reflect in x axis
@@ -1364,7 +1373,7 @@ func (d Decimal) Cos() Decimal {
 		y = z.Add(z.Mul(zz).Mul(_sin[0].Mul(zz).Add(_sin[1]).Mul(zz).Add(_sin[2]).Mul(zz).Add(_sin[3]).Mul(zz).Add(_sin[4]).Mul(zz).Add(_sin[5])))
 	} else {
 		w := zz.Mul(zz).Mul(_cos[0].Mul(zz).Add(_cos[1]).Mul(zz).Add(_cos[2]).Mul(zz).Add(_cos[3]).Mul(zz).Add(_cos[4]).Mul(zz).Add(_cos[5]))
-		y = NewFromFloat(1.0).Sub(NewFromFloat(0.5).Mul(zz)).Add(w)
+		y = One.Sub(New(5, -1).Mul(zz)).Add(w)
 	}
 	if sign {
 		y = y.Neg()
@@ -1393,13 +1402,13 @@ func (d Decimal) Tan() Decimal {
 	PI4C := NewFromFloat(2.69515142907905952645e-15)                            // 0x3ce8469898cc5170,
 	M4PI := NewFromFloat(1.273239544735162542821171882678754627704620361328125) // 4/pi
 
-	if d.Equal(NewFromFloat(0.0)) {
+	if d.IsZero() {
 		return d
 	}
 
 	// make argument positive but save the sign
 	sign := false
-	if d.LessThan(NewFromFloat(0.0)) {
+	if d.IsNegative() {
 		d = d.Neg()
 		sign = true
 	}
@@ -1410,13 +1419,13 @@ func (d Decimal) Tan() Decimal {
 	// map zeros to origin
 	if j&1 == 1 {
 		j++
-		y = y.Add(NewFromFloat(1.0))
+		y = y.Add(One)
 	}
 
 	z := d.Sub(y.Mul(PI4A)).Sub(y.Mul(PI4B)).Sub(y.Mul(PI4C)) // Extended precision modular arithmetic
 	zz := z.Mul(z)
 
-	if zz.GreaterThan(NewFromFloat(1e-14)) {
+	if zz.GreaterThan(New(1, -14)) {
 		w := zz.Mul(_tanP[0].Mul(zz).Add(_tanP[1]).Mul(zz).Add(_tanP[2]))
 		x := zz.Add(_tanQ[1]).Mul(zz).Add(_tanQ[2]).Mul(zz).Add(_tanQ[3]).Mul(zz).Add(_tanQ[4])
 		y = z.Add(z.Mul(w.Div(x)))
@@ -1424,7 +1433,7 @@ func (d Decimal) Tan() Decimal {
 		y = z
 	}
 	if j&2 == 2 {
-		y = NewFromFloat(-1.0).Div(y)
+		y = New(-1, 0).Div(y)
 	}
 	if sign {
 		y = y.Neg()
