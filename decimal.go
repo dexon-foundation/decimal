@@ -116,9 +116,13 @@ func NewFromString(value string) (Decimal, error) {
 		expInt, err := strconv.ParseInt(value[eIndex+1:], 10, 32)
 		if err != nil {
 			if e, ok := err.(*strconv.NumError); ok && e.Err == strconv.ErrRange {
-				return Decimal{}, fmt.Errorf("can't convert %s to decimal: fractional part too long", value)
+				return Decimal{}, &ErrorExponentLimit{value: value}
 			}
-			return Decimal{}, fmt.Errorf("can't convert %s to decimal: exponent is not numeric", value)
+			return Decimal{}, &ErrorInvalidFormat{
+				reason: fmt.Sprintf(
+					"can't convert %s to decimal: exponent is not numeric",
+					value),
+			}
 		}
 		value = value[:eIndex]
 		exp = expInt
@@ -139,18 +143,26 @@ func NewFromString(value string) (Decimal, error) {
 		expInt := -len(decimalPart)
 		exp += int64(expInt)
 	} else {
-		return Decimal{}, fmt.Errorf("can't convert %s to decimal: too many .s", value)
+		return Decimal{}, &ErrorInvalidFormat{
+			reason: fmt.Sprintf(
+				"can't convert %s to decimal: too many .s",
+				value),
+		}
 	}
 
 	dValue := new(big.Int)
 	_, ok := dValue.SetString(intString, 10)
 	if !ok {
-		return Decimal{}, fmt.Errorf("can't convert %s to decimal", value)
+		return Decimal{}, &ErrorInvalidFormat{
+			reason: fmt.Sprintf("can't convert %s to decimal", value),
+		}
 	}
 
 	if exp < math.MinInt32 || exp > math.MaxInt32 {
 		// NOTE(vadim): I doubt a string could realistically be this long
-		return Decimal{}, fmt.Errorf("can't convert %s to decimal: fractional part too long", originalInput)
+		return Decimal{}, &ErrorExponentLimit{
+			value: originalInput,
+		}
 	}
 
 	return Decimal{
@@ -931,13 +943,13 @@ func (d *Decimal) UnmarshalJSON(decimalBytes []byte) error {
 
 	str, err := unquoteIfQuoted(decimalBytes)
 	if err != nil {
-		return fmt.Errorf("Error decoding string '%s': %s", decimalBytes, err)
+		return err
 	}
 
 	decimal, err := NewFromString(str)
 	*d = decimal
 	if err != nil {
-		return fmt.Errorf("Error decoding string '%s': %s", str, err)
+		return err
 	}
 	return nil
 }
@@ -1025,7 +1037,7 @@ func (d *Decimal) UnmarshalText(text []byte) error {
 	dec, err := NewFromString(str)
 	*d = dec
 	if err != nil {
-		return fmt.Errorf("Error decoding string '%s': %s", str, err)
+		return err
 	}
 
 	return nil
@@ -1171,8 +1183,11 @@ func unquoteIfQuoted(value interface{}) (string, error) {
 	case []byte:
 		bytes = v
 	default:
-		return "", fmt.Errorf("Could not convert value '%+v' to byte array of type '%T'",
-			value, value)
+		return "", &ErrorInvalidType{
+			reason: fmt.Sprintf(
+				"Could not convert value '%+v' to byte array of type '%T'",
+				value, value),
+		}
 	}
 
 	// If the amount is quoted, strip the quotes
