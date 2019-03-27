@@ -6,6 +6,10 @@ Arbitrary-precision fixed-point decimal numbers in go.
 
 NOTE: can "only" represent numbers with a maximum of 2^31 digits after the decimal point.
 
+## THIS IS UNSTABLE BRANCH
+master branch is under development. API changes can be introduced any time. If
+you are seeking a stable version, please access v1.x tags.
+
 ## Features
 
  * the zero-value is 0, and is safe to use without initialization
